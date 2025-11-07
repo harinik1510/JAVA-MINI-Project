@@ -1,25 +1,98 @@
+package kh;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 
-
-public class PasswordGenerator {
+public class PasswordGeneratorGUI extends JFrame {
     private static final SecureRandom secureRandom = new SecureRandom();
-
     private static final String LOWER = "abcdefghijklmnopqrstuvwxyz";
     private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     private static final String DIGITS = "0123456789";
-    // Common printable symbols. You can edit this if you want other symbols.
     private static final String SYMBOLS = "!@#$%^&*()-_=+[]{}|;:,.<>?/";
 
+    // GUI components
+    private JTextField lengthField;
+    private JCheckBox lowerBox, upperBox, digitsBox, symbolsBox;
+    private JTextArea outputArea;
+
+    public PasswordGeneratorGUI() {
+        setTitle("Password Generator");
+        setSize(450, 350);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null); // center the window
+        setLayout(new BorderLayout(10, 10));
+
+        // ==== Top Panel ====
+        JPanel inputPanel = new JPanel(new GridLayout(6, 2, 10, 10));
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        inputPanel.add(new JLabel("Password Length:"));
+        lengthField = new JTextField("16");
+        inputPanel.add(lengthField);
+
+        lowerBox = new JCheckBox("Include Lowercase (a-z)", true);
+        upperBox = new JCheckBox("Include Uppercase (A-Z)", true);
+        digitsBox = new JCheckBox("Include Digits (0-9)", true);
+        symbolsBox = new JCheckBox("Include Symbols (!@#...)", true);
+
+        inputPanel.add(lowerBox);
+        inputPanel.add(upperBox);
+        inputPanel.add(digitsBox);
+        inputPanel.add(symbolsBox);
+
+        JButton generateBtn = new JButton("Generate Password");
+        generateBtn.addActionListener(this::generatePasswordAction);
+
+        inputPanel.add(new JLabel()); // Empty space
+        inputPanel.add(generateBtn);
+
+        add(inputPanel, BorderLayout.NORTH);
+
+        // ==== Output Area ====
+        outputArea = new JTextArea(5, 30);
+        outputArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        outputArea.setEditable(false);
+        outputArea.setLineWrap(true);
+        outputArea.setWrapStyleWord(true);
+
+        JScrollPane scrollPane = new JScrollPane(outputArea);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Generated Password"));
+        add(scrollPane, BorderLayout.CENTER);
+
+        setVisible(true);
+    }
+
+    private void generatePasswordAction(ActionEvent e) {
+        try {
+            int length = Integer.parseInt(lengthField.getText().trim());
+            boolean useLower = lowerBox.isSelected();
+            boolean useUpper = upperBox.isSelected();
+            boolean useDigits = digitsBox.isSelected();
+            boolean useSymbols = symbolsBox.isSelected();
+
+            String password = generatePassword(length, useLower, useUpper, useDigits, useSymbols);
+            outputArea.setText(password);
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid number for password length.",
+                    "Invalid Input", JOptionPane.ERROR_MESSAGE);
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // Core password generation logic
     public static String generatePassword(int length, boolean useLower, boolean useUpper,
                                           boolean useDigits, boolean useSymbols) {
+
         if (length <= 0) {
             throw new IllegalArgumentException("Password length must be > 0");
         }
 
-        // Build the pool and keep category strings in a list for guaranteed inclusion
         StringBuilder allChars = new StringBuilder();
         List<String> requiredCategories = new ArrayList<>();
 
@@ -45,27 +118,24 @@ public class PasswordGenerator {
         }
 
         if (length < requiredCategories.size()) {
-            // If user asks length smaller than number of required categories, we cannot guarantee inclusion
             throw new IllegalArgumentException(
-                    "Length too short to include at least one character from each selected category. " +
-                            "Required minimum length: " + requiredCategories.size()
+                    "Length too short to include one character from each selected category. " +
+                            "Minimum required length: " + requiredCategories.size()
             );
         }
 
         char[] password = new char[length];
 
-        // First, place one guaranteed character from each selected category at random positions
-        for (int i = 0; i < requiredCategories.size(); i++) {
-            String category = requiredCategories.get(i);
+        // Ensure one char from each category
+        for (String category : requiredCategories) {
             int pos;
-            // find a free position
             do {
                 pos = secureRandom.nextInt(length);
-            } while (password[pos] != '\u0000'); // '\u0000' indicates empty slot
+            } while (password[pos] != '\u0000');
             password[pos] = category.charAt(secureRandom.nextInt(category.length()));
         }
 
-        // Fill remaining positions with random characters from the combined pool
+        // Fill remaining positions
         for (int i = 0; i < length; i++) {
             if (password[i] == '\u0000') {
                 password[i] = allChars.charAt(secureRandom.nextInt(allChars.length()));
@@ -75,82 +145,7 @@ public class PasswordGenerator {
         return new String(password);
     }
 
-    private static boolean parseBooleanOrDefault(String s, boolean defaultVal) {
-        if (s == null) return defaultVal;
-        s = s.trim().toLowerCase();
-        if (s.equals("true") || s.equals("t") || s.equals("yes") || s.equals("y") || s.equals("1")) return true;
-        if (s.equals("false") || s.equals("f") || s.equals("no") || s.equals("n") || s.equals("0")) return false;
-        return defaultVal;
-    }
-
     public static void main(String[] args) {
-        int length = 16;
-        boolean useLower = true;
-        boolean useUpper = true;
-        boolean useDigits = true;
-        boolean useSymbols = true;
-
-        if (args.length >= 1) {
-            try {
-                length = Integer.parseInt(args[0]);
-            } catch (NumberFormatException e) {
-                System.err.println("Invalid length argument. Using default length 16.");
-                length = 16;
-            }
-        }
-        if (args.length >= 5) {
-            // args: length lower upper digits symbols
-            useLower = parseBooleanOrDefault(args[1], true);
-            useUpper = parseBooleanOrDefault(args[2], true);
-            useDigits = parseBooleanOrDefault(args[3], true);
-            useSymbols = parseBooleanOrDefault(args[4], true);
-            try {
-                String pw = generatePassword(length, useLower, useUpper, useDigits, useSymbols);
-                System.out.println(pw);
-                return;
-            } catch (IllegalArgumentException ex) {
-                System.err.println("Error: " + ex.getMessage());
-                System.exit(1);
-            }
-        }
-
-        // Interactive mode
-        Scanner sc = new Scanner(System.in);
-        System.out.println("=== Password Generator ===");
-        System.out.print("Password length (default 16): ");
-        String line = sc.nextLine().trim();
-        if (!line.isEmpty()) {
-            try {
-                length = Integer.parseInt(line);
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid number, using default 16.");
-                length = 16;
-            }
-        }
-
-        System.out.print("Include lowercase letters? (Y/n, default Y): ");
-        line = sc.nextLine().trim();
-        useLower = !line.equalsIgnoreCase("n") && !line.equalsIgnoreCase("no");
-
-        System.out.print("Include uppercase letters? (Y/n, default Y): ");
-        line = sc.nextLine().trim();
-        useUpper = !line.equalsIgnoreCase("n") && !line.equalsIgnoreCase("no");
-
-        System.out.print("Include digits? (Y/n, default Y): ");
-        line = sc.nextLine().trim();
-        useDigits = !line.equalsIgnoreCase("n") && !line.equalsIgnoreCase("no");
-
-        System.out.print("Include symbols? (Y/n, default Y): ");
-        line = sc.nextLine().trim();
-        useSymbols = !line.equalsIgnoreCase("n") && !line.equalsIgnoreCase("no");
-
-        try {
-            String password = generatePassword(length, useLower, useUpper, useDigits, useSymbols);
-            System.out.println("\nGenerated password:");
-            System.out.println(password);
-        } catch (IllegalArgumentException ex) {
-            System.err.println("Error: " + ex.getMessage());
-            System.exit(1);
-        }
+        SwingUtilities.invokeLater(PasswordGeneratorGUI::new);
     }
 }
